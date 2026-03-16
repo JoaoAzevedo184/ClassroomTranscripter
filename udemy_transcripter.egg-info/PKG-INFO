@@ -1,0 +1,183 @@
+Metadata-Version: 2.4
+Name: udemy-transcripter
+Version: 1.0.0
+Summary: Extrai transcrições/legendas de cursos da Udemy
+Author: João Victor Azevedo
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: curl_cffi>=0.7
+Requires-Dist: requests>=2.28
+Requires-Dist: python-dotenv>=1.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+
+# 🎓 Udemy Transcripter
+
+Ferramenta CLI em Python para extrair transcrições/legendas de cursos que você comprou na Udemy.
+
+## Requisitos
+
+- Python 3.10+
+- `curl_cffi` — necessário para bypass do Cloudflare
+- `requests`
+- `python-dotenv`
+
+## Instalação
+
+```bash
+# Clone o repositório
+git clone https://github.com/JoaoAzevedo184/UdemyTranscripter.git
+cd UdemyTranscripter
+
+# Instale as dependências
+pip install -e .
+
+# Ou apenas as dependências sem instalar o pacote
+pip install -r requirements.txt
+```
+
+## Configuração inicial
+
+### 1. Obtenha os cookies do navegador
+
+1. Acesse [udemy.com](https://udemy.com) e faça login
+2. Abra o **DevTools** do navegador (`F12`)
+3. Vá na aba **Network** e recarregue a página
+4. Clique em alguma requisição para `www.udemy.com`
+5. Em **Request Headers**, copie o valor completo do header **`Cookie`**
+
+> ⚠️ **Nunca compartilhe seus cookies.** Eles dão acesso à sua conta.
+> Os cookies expiram periodicamente — se der erro 403, gere novos.
+
+### 2. Configure o `.env` (recomendado)
+
+```bash
+# Setup interativo — cria o .env e o .gitignore automaticamente
+python -m udemy_transcripter --setup
+```
+
+Ou crie manualmente um arquivo `.env`:
+
+```env
+UDEMY_COOKIES='access_token=xxx; cf_clearance=yyy; client_id=zzz; ...'
+```
+
+## Uso
+
+```bash
+# Listar idiomas disponíveis
+python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --list-langs
+
+# Baixar transcrições (texto limpo)
+python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/"
+
+# Baixar com timestamps
+python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --timestamps
+
+# Gerar arquivo único (ideal para resumos com IA)
+python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --merge
+
+# Combinar opções
+python -m udemy_transcripter \
+  --url "https://udemy.com/course/meu-curso/" \
+  --lang pt --merge --timestamps --output ./meus_cursos
+
+# Depurar problemas
+python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --debug
+```
+
+> Todos os comandos assumem que o cookie está no `.env`. Se preferir, passe `--cookie 'SUA_STRING'`.
+
+## Uso como biblioteca
+
+```python
+from udemy_transcripter import UdemyClient, download_transcripts
+
+client = UdemyClient("access_token=...; cf_clearance=...")
+result = download_transcripts(client, slug="docker-basico", merge=True)
+print(f"Baixadas {result.downloaded} transcrições")
+```
+
+## Estrutura de saída
+
+```
+udemy_transcripts/
+└── Nome do Curso/
+    ├── _metadata.json
+    ├── _CURSO_COMPLETO.txt        # (com --merge)
+    ├── 01 - Introdução/
+    │   ├── 001 - Bem-vindo.txt
+    │   └── 002 - Configuração.txt
+    ├── 02 - Fundamentos/
+    │   ├── 003 - Variáveis.txt
+    │   └── 004 - Funções.txt
+    └── ...
+```
+
+## Estrutura do projeto
+
+```
+udemy_transcripter/
+├── udemy_transcripter/        # Pacote principal
+│   ├── __init__.py            # API pública
+│   ├── __main__.py            # Entry point: python -m udemy_transcripter
+│   ├── cli.py                 # Interface de linha de comando
+│   ├── client.py              # Cliente HTTP (Cloudflare bypass)
+│   ├── config.py              # Constantes e carregamento de .env
+│   ├── downloader.py          # Lógica de download e salvamento
+│   ├── exceptions.py          # Exceções customizadas
+│   ├── models.py              # Dataclasses do domínio
+│   ├── setup.py               # Configuração interativa do .env
+│   ├── utils.py               # Funções utilitárias
+│   └── vtt.py                 # Parser de legendas WebVTT
+├── tests/                     # Testes unitários
+│   ├── test_client.py
+│   ├── test_config.py
+│   ├── test_utils.py
+│   └── test_vtt.py
+├── .env.example
+├── .gitignore
+├── pyproject.toml
+├── requirements.txt
+└── README.md
+```
+
+## Opções
+
+| Flag | Descrição |
+|------|-----------|
+| `--setup` | Criar/atualizar `.env` interativamente |
+| `--cookie`, `-c` | Cookie string do navegador (opcional se usar `.env`) |
+| `--url`, `-u` | URL ou slug do curso **(obrigatório)** |
+| `--output`, `-o` | Diretório de saída (padrão: `./udemy_transcripts`) |
+| `--lang`, `-l` | Idioma preferido (`pt`, `en`, `es`, etc.) |
+| `--timestamps`, `-t` | Incluir timestamps `[HH:MM:SS]` no texto |
+| `--merge`, `-m` | Gerar arquivo único `_CURSO_COMPLETO.txt` |
+| `--list-langs` | Apenas listar idiomas disponíveis |
+| `--debug` | Exibir detalhes das requisições para depuração |
+
+## Testes
+
+```bash
+pip install -e ".[dev]"
+pytest -v
+```
+
+## Dicas para uso com IA
+
+O arquivo gerado com `--merge` é ideal para:
+
+- **Resumos**: Envie o `_CURSO_COMPLETO.txt` para o Claude e peça um resumo por seção
+- **Flashcards**: Peça para extrair conceitos-chave em formato de perguntas e respostas
+- **Busca**: Use `grep` ou qualquer editor para buscar tópicos específicos
+- **Ollama local**: Processe com modelos locais no seu homelab
+
+## Notas
+
+- Só funciona com cursos **que você comprou**
+- Depende das legendas/captions que o instrutor disponibilizou
+- Nem todas as aulas possuem transcrição
+- Respeite os termos de uso da Udemy (uso pessoal)

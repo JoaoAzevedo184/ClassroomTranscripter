@@ -1,0 +1,2 @@
+[console_scripts]
+udemy-transcripter = udemy_transcripter.cli:main
