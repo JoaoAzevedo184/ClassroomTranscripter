@@ -9,7 +9,8 @@ import requests
 from .client import UdemyClient
 from .config import DOWNLOAD_DELAY
 from .exceptions import NoCaptionsError
-from .models import DownloadResult, Section
+from .formatters import BaseFormatter, PlainTextFormatter
+from .models import DownloadResult, Lecture, Section
 from .utils import pick_caption, sanitize_filename
 from .vtt import to_plain_text, to_timestamped_text
 
@@ -51,6 +52,7 @@ def download_transcripts(
     lang: str | None = None,
     with_timestamps: bool = False,
     merge: bool = False,
+    formatter: BaseFormatter | None = None,
 ) -> DownloadResult:
     """Baixa todas as transcrições de um curso.
 
@@ -60,7 +62,8 @@ def download_transcripts(
         output_dir: Diretório raiz de saída.
         lang: Idioma preferido (ex: "pt", "en").
         with_timestamps: Se True, inclui timestamps [HH:MM:SS].
-        merge: Se True, gera arquivo único _CURSO_COMPLETO.txt.
+        merge: Se True, gera arquivo mesclado.
+        formatter: Formatador de saída (padrão: PlainTextFormatter).
 
     Returns:
         DownloadResult com estatísticas do download.
@@ -68,6 +71,9 @@ def download_transcripts(
     Raises:
         NoCaptionsError: Se nenhuma legenda estiver disponível.
     """
+    if formatter is None:
+        formatter = PlainTextFormatter()
+
     # Busca informações do curso
     print(f"\n🎓 Buscando informações do curso: {slug}")
     course_id, course_title = client.get_course_info(slug)
@@ -92,17 +98,36 @@ def download_transcripts(
     course_dir.mkdir(parents=True, exist_ok=True)
 
     # Faz o download
-    downloaded, errors, merged_content = _download_sections(
+    downloaded, errors, transcripts = _download_sections(
         sections=sections,
         course_dir=course_dir,
         lang=lang,
         with_timestamps=with_timestamps,
-        collect_merge=merge,
+        formatter=formatter,
+        course_title=course_title,
+        slug=slug,
     )
 
     # Salva arquivo mesclado
-    if merge and merged_content:
-        _save_merged_file(course_dir, course_title, downloaded, merged_content)
+    if merge and transcripts:
+        merged_content = formatter.format_merged(
+            sections=sections,
+            transcripts=transcripts,
+            course_title=course_title,
+            total_downloaded=downloaded,
+        )
+        merged_path = course_dir / formatter.get_merged_filename()
+        merged_path.write_text(merged_content, encoding="utf-8")
+        print(f"\n📄 Arquivo completo: {merged_path}")
+
+    # Salva arquivos extras (MOC, índices, etc.)
+    formatter.save_extras(
+        course_dir=course_dir,
+        sections=sections,
+        transcripts=transcripts,
+        course_title=course_title,
+        slug=slug,
+    )
 
     # Salva metadados
     _save_metadata(
@@ -132,54 +157,82 @@ def download_transcripts(
 # ─── Funções internas ──────────────────────────────────────────────────────
 
 
+def _build_lecture_navigation(
+    sections: list[Section],
+) -> dict[int, tuple[Lecture | None, Lecture | None]]:
+    """Constrói mapa de navegação (prev, next) para cada lecture.
+
+    Returns:
+        Dict de lecture.id -> (prev_lecture, next_lecture)
+    """
+    all_lectures: list[Lecture] = []
+    for section in sections:
+        for lecture in section.lectures:
+            if lecture.captions:
+                all_lectures.append(lecture)
+
+    nav: dict[int, tuple[Lecture | None, Lecture | None]] = {}
+    for i, lecture in enumerate(all_lectures):
+        prev_lec = all_lectures[i - 1] if i > 0 else None
+        next_lec = all_lectures[i + 1] if i < len(all_lectures) - 1 else None
+        nav[lecture.id] = (prev_lec, next_lec)
+
+    return nav
+
+
 def _download_sections(
     sections: list[Section],
     course_dir: Path,
     lang: str | None,
     with_timestamps: bool,
-    collect_merge: bool,
-) -> tuple[int, int, list[str]]:
+    formatter: BaseFormatter,
+    course_title: str,
+    slug: str,
+) -> tuple[int, int, dict[int, str]]:
     """Itera sobre seções/aulas e baixa as legendas.
 
     Returns:
-        Tupla (downloaded, errors, merged_content).
+        Tupla (downloaded, errors, transcripts).
+        transcripts mapeia lecture.id -> texto da transcrição.
     """
     downloaded = 0
     errors = 0
-    merged_content: list[str] = []
+    transcripts: dict[int, str] = {}
+
+    # Monta navegação prev/next
+    nav = _build_lecture_navigation(sections)
 
     for section in sections:
-        section_name = f"{section.index:02d} - {sanitize_filename(section.title)}"
-        section_dir = course_dir / section_name
+        section_dir = course_dir / formatter.get_section_dirname(section)
         section_dir.mkdir(exist_ok=True)
-
-        if collect_merge:
-            merged_content.append(f"\n{'='*60}")
-            merged_content.append(f"SEÇÃO: {section.title}")
-            merged_content.append(f"{'='*60}\n")
 
         for lecture in section.lectures:
             caption = pick_caption(lecture.captions, lang)
             if not caption:
                 continue
 
-            lecture_name = (
-                f"{lecture.object_index:03d} - {sanitize_filename(lecture.title)}"
-            )
-            print(f"   ⬇ {lecture_name} [{caption.label}]")
+            filename = formatter.get_lecture_filename(lecture)
+            display_name = filename.removesuffix(formatter.file_extension())
+            print(f"   ⬇ {display_name} [{caption.label}]")
 
             try:
-                text = _fetch_and_convert(
-                    caption.url, with_timestamps
-                )
-                # Salva arquivo individual
-                txt_path = section_dir / f"{lecture_name}.txt"
-                txt_path.write_text(text, encoding="utf-8")
+                raw_text = _fetch_and_convert(caption.url, with_timestamps)
+                transcripts[lecture.id] = raw_text
 
-                if collect_merge:
-                    merged_content.append(f"\n--- {lecture.title} ---\n")
-                    merged_content.append(text)
-                    merged_content.append("")
+                # Formata com o formatador escolhido
+                prev_lec, next_lec = nav.get(lecture.id, (None, None))
+                content = formatter.format_lecture(
+                    lecture=lecture,
+                    section=section,
+                    transcript=raw_text,
+                    course_title=course_title,
+                    slug=slug,
+                    prev_lecture=prev_lec,
+                    next_lecture=next_lec,
+                )
+
+                file_path = section_dir / filename
+                file_path.write_text(content, encoding="utf-8")
 
                 downloaded += 1
                 time.sleep(DOWNLOAD_DELAY)
@@ -188,7 +241,7 @@ def _download_sections(
                 print(f"   ✗ Erro: {e}")
                 errors += 1
 
-    return downloaded, errors, merged_content
+    return downloaded, errors, transcripts
 
 
 def _fetch_and_convert(url: str, with_timestamps: bool) -> str:
@@ -200,25 +253,6 @@ def _fetch_and_convert(url: str, with_timestamps: bool) -> str:
     if with_timestamps:
         return to_timestamped_text(vtt_content)
     return to_plain_text(vtt_content)
-
-
-def _save_merged_file(
-    course_dir: Path,
-    course_title: str,
-    downloaded: int,
-    merged_content: list[str],
-) -> None:
-    """Salva o arquivo mesclado _CURSO_COMPLETO.txt."""
-    merged_path = course_dir / "_CURSO_COMPLETO.txt"
-    header = (
-        f"Curso: {course_title}\n"
-        f"Total de aulas transcritas: {downloaded}\n"
-        f"{'='*60}\n"
-    )
-    merged_path.write_text(
-        header + "\n".join(merged_content), encoding="utf-8"
-    )
-    print(f"\n📄 Arquivo completo: {merged_path}")
 
 
 def _save_metadata(

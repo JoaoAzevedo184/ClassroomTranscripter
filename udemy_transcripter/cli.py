@@ -1,40 +1,52 @@
 """Interface de linha de comando."""
 
 import argparse
+from pathlib import Path
 
 from .client import UdemyClient
 from .config import load_config, resolve_cookies
 from .downloader import download_transcripts, list_available_captions
+from .enricher import create_provider, enrich_directory
 from .exceptions import UdemyTranscripterError
+from .formatters import FORMATTERS, get_formatter
 from .setup import setup_env
 from .utils import extract_slug
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Constrói o parser de argumentos."""
+    available_formats = ", ".join(FORMATTERS.keys())
+
     parser = argparse.ArgumentParser(
         prog="udemy_transcripter",
         description="Extrai transcrições de cursos da Udemy",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 Exemplos:
   # Configurar cookies (primeira vez)
   python -m udemy_transcripter --setup
 
-  # Usando .env (após setup)
-  python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/"
+  # Baixar como Markdown para Obsidian
+  python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --format obsidian
 
-  # Listar idiomas disponíveis
-  python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --list-langs
+  # Enriquecer notas com Ollama (local)
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider ollama
 
-  # Baixar com timestamps + arquivo mesclado para IA
-  python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --timestamps --merge
+  # Enriquecer com modelo específico do Ollama
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso \\
+    --provider ollama --model qwen2.5:14b
 
-  # Depurar problemas de autenticação
-  python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --list-langs --debug
+  # Enriquecer com Claude API
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider claude
+
+  # Preview do enriquecimento (sem alterar arquivos)
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider ollama --dry-run
+
+Formatos disponíveis: {available_formats}
         """,
     )
 
+    # ─── Download ───────────────────────────────────────────────────────
     parser.add_argument(
         "--cookie", "-c", default=None,
         help="String completa de cookies do navegador (opcional se usar .env)",
@@ -46,6 +58,10 @@ Exemplos:
     parser.add_argument(
         "--output", "-o", default="./udemy_transcripts",
         help="Diretório de saída (padrão: ./udemy_transcripts)",
+    )
+    parser.add_argument(
+        "--format", "-f", default="txt", choices=FORMATTERS.keys(),
+        help="Formato de saída: txt (padrão) ou obsidian",
     )
     parser.add_argument(
         "--lang", "-l", default=None,
@@ -63,6 +79,38 @@ Exemplos:
         "--list-langs", action="store_true",
         help="Apenas listar idiomas de legenda disponíveis",
     )
+
+    # ─── Enriquecimento com IA ──────────────────────────────────────────
+    parser.add_argument(
+        "--enrich", metavar="DIR", default=None,
+        help="Enriquecer notas .md do diretório com IA",
+    )
+    parser.add_argument(
+        "--provider", default="ollama", choices=["ollama", "claude"],
+        help="Provider de IA: ollama (padrão) ou claude",
+    )
+    parser.add_argument(
+        "--model", default=None,
+        help="Modelo a usar (ex: llama3.1, qwen2.5:14b, claude-sonnet-4-20250514)",
+    )
+    parser.add_argument(
+        "--api-key", default=None,
+        help="API key (necessário para claude, ou defina ANTHROPIC_API_KEY no .env)",
+    )
+    parser.add_argument(
+        "--ollama-url", default=None,
+        help="URL do Ollama (padrão: http://localhost:11434)",
+    )
+    parser.add_argument(
+        "--delay", type=float, default=1.0,
+        help="Delay entre chamadas de IA em segundos (padrão: 1.0)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Preview do enriquecimento sem alterar arquivos",
+    )
+
+    # ─── Geral ──────────────────────────────────────────────────────────
     parser.add_argument(
         "--setup", action="store_true",
         help="Criar/atualizar arquivo .env interativamente",
@@ -88,12 +136,55 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # Setup interativo
+    # ─── Setup interativo ───────────────────────────────────────────────
     if args.setup:
         setup_env()
         return 0
 
-    # Resolver cookies
+    # ─── Enriquecimento com IA ──────────────────────────────────────────
+    if args.enrich:
+        return _handle_enrich(args)
+
+    # ─── Download ───────────────────────────────────────────────────────
+    return _handle_download(args, parser)
+
+
+def _handle_enrich(args: argparse.Namespace) -> int:
+    """Executa o enriquecimento de notas com IA."""
+    enrich_dir = Path(args.enrich)
+    if not enrich_dir.is_dir():
+        print(f"✗ Diretório não encontrado: {enrich_dir}")
+        return 1
+
+    try:
+        provider = create_provider(
+            provider_name=args.provider,
+            model=args.model,
+            api_key=args.api_key,
+            base_url=args.ollama_url,
+        )
+    except ValueError as e:
+        print(f"✗ {e}")
+        return 1
+
+    try:
+        enrich_directory(
+            directory=enrich_dir,
+            provider=provider,
+            delay=args.delay,
+            dry_run=args.dry_run,
+        )
+    except Exception as e:
+        print(f"\n✗ Erro no enriquecimento: {e}")
+        if args.debug:
+            raise
+        return 1
+
+    return 0
+
+
+def _handle_download(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """Executa o download de transcrições."""
     cookie_data = resolve_cookies(args.cookie)
 
     if not cookie_data:
@@ -104,18 +195,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if not args.url:
-        parser.error("--url é obrigatório (a menos que use --setup)")
+        parser.error("--url é obrigatório (a menos que use --setup ou --enrich)")
 
     slug = extract_slug(args.url)
     client = UdemyClient(cookie_data, debug=args.debug)
+    formatter = get_formatter(args.format)
 
     if args.debug:
         display = cookie_data[:30] + "..." if len(cookie_data) > 30 else cookie_data
         print(f"[DEBUG] Cookie data: {display} ({len(cookie_data)} chars)")
         print(f"[DEBUG] Slug: {slug}")
+        print(f"[DEBUG] Formato: {args.format}")
         print()
 
-    # Executa o comando
     try:
         if args.list_langs:
             list_available_captions(client, slug)
@@ -127,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
                 lang=args.lang,
                 with_timestamps=args.timestamps,
                 merge=args.merge,
+                formatter=formatter,
             )
     except UdemyTranscripterError as e:
         print(f"\n✗ {e}")
