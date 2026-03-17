@@ -39,6 +39,12 @@ Exemplos:
   # Enriquecer com Claude API
   python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider claude
 
+  # Enriquecer com Groq (gratuito, ultra-rápido)
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider groq
+
+  # Enriquecer com Gemini (gratuito, sem cartão)
+  python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider gemini
+
   # Preview do enriquecimento (sem alterar arquivos)
   python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider ollama --dry-run
 
@@ -86,16 +92,16 @@ Formatos disponíveis: {available_formats}
         help="Enriquecer notas .md do diretório com IA",
     )
     parser.add_argument(
-        "--provider", default="ollama", choices=["ollama", "claude"],
-        help="Provider de IA: ollama (padrão) ou claude",
+        "--provider", default="ollama", choices=["ollama", "claude", "groq", "gemini"],
+        help="Provider de IA: ollama (padrão), claude, groq ou gemini",
     )
     parser.add_argument(
         "--model", default=None,
-        help="Modelo a usar (ex: llama3.1, qwen2.5:14b, claude-sonnet-4-20250514)",
+        help="Modelo (ex: llama3.1, llama-3.3-70b-versatile, claude-sonnet-4-20250514)",
     )
     parser.add_argument(
         "--api-key", default=None,
-        help="API key (necessário para claude, ou defina ANTHROPIC_API_KEY no .env)",
+        help="API key (para claude: ANTHROPIC_API_KEY, para groq: GROQ_API_KEY)",
     )
     parser.add_argument(
         "--ollama-url", default=None,

@@ -1,11 +1,14 @@
 """Enriquecimento de transcrições com IA.
 
 Lê arquivos .md gerados pelo Obsidian formatter, envia para uma LLM
-e reescreve com foco educativo: código, estrutura, exemplos.
+e reescreve com foco educativo: estrutura visual, seções escaneáveis,
+blocos de código, emojis nos headings, perguntas de revisão.
 
 Providers suportados:
 - Ollama (local, gratuito)
-- Claude API (Anthropic)
+- Groq (nuvem, gratuito, ultra-rápido)
+- Gemini (nuvem, gratuito, Google)
+- Claude API (Anthropic, pago)
 """
 
 from __future__ import annotations
@@ -33,54 +36,95 @@ class EnrichResult:
 # ─── System Prompt ──────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """\
-Você é um assistente educacional especializado em criar material de estudo \
-de alta qualidade a partir de transcrições de aulas.
+Você é um assistente educacional especializado em transformar transcrições brutas \
+de aulas em notas de estudo visualmente claras, didáticas e fáceis de escanear.
 
 ## Sua tarefa
 
-Receba a transcrição de uma aula e reescreva como uma nota de estudo \
-completa e educativa em Markdown, mantendo o frontmatter YAML original intacto.
+Receba a transcrição (gerada a partir de áudio) de uma aula e reescreva como uma nota \
+de estudo completa em Markdown, seguindo o formato visual descrito abaixo.
 
 ## Regras obrigatórias
 
 1. **Mantenha o frontmatter YAML** (bloco `---`) EXATAMENTE como está, sem alterar
-2. **Mantenha a seção "## Anotações"** no final (vazia para o aluno preencher)
-3. **Mantenha o callout de navegação** (`> [!tip] Navegação`) se existir
-4. **Idioma**: responda no mesmo idioma da transcrição original
-5. **Extensão**: a nota enriquecida deve ser mais completa que a transcrição original
+2. **Mantenha o callout de navegação** (`> [!tip] Navegação`) se existir
+3. **Idioma**: responda no mesmo idioma da transcrição original
+4. **Limpeza da fala**: remova vícios de linguagem (né, ahn, hum), repetições, frases \
+incompletas e gaguejos. Transforme a linguagem oral em texto escrito claro e direto
+5. **Não invente** informações que não estão na transcrição (zero alucinação)
+6. **Não perca** conteúdo relevante — a nota deve ser exaustiva
+7. Entregue APENAS o Markdown final. Sem introduções como "Aqui está a nota" ou "Claro"
 
-## O que você deve fazer
+## Formato visual obrigatório
 
-### Estrutura educativa
-- Reorganize o conteúdo com **headings claros** (##, ###)
-- Separe em seções lógicas (conceito → explicação → exemplo → resumo)
-- Adicione **bullet points** para listas de conceitos
-- Inclua um **TL;DR** no topo com os pontos principais da aula
+### Emojis nos headings
+Use emojis temáticos no início de cada seção principal (nível #):
+- `# 📚 Visão Geral da Aula` — resumo do tema
+- `# 🎯 Objetivos` — o que o aluno vai aprender
+- `# 🧠 Conceitos` — conteúdo principal
+- `# 🧾 Resumo da Aula` — pontos-chave
+- `# 🔁 Perguntas para Revisão` — fixação
+- `# ✍️ Anotações` — espaço do aluno (manter vazio)
+- Use outros emojis quando apropriado (👨‍🏫, ⚙️, 🧩, 👥, etc.)
 
-### Código e exemplos práticos
-- Adicione **blocos de código** que ilustrem os conceitos da aula
-- Use a linguagem/tecnologia correta do contexto do curso
-- Inclua comentários explicativos no código
-- Se a aula menciona comandos, liste-os em blocos ```bash```
-- Adicione exemplos de **input/output** quando relevante
+### Separadores visuais
+Use `---` (horizontal rule) entre TODAS as seções principais para criar \
+separação visual clara. Cada bloco `#` deve ser precedido por `---`.
 
-### Enriquecimento pedagógico
-- Destaque **termos-chave** em negrito na primeira ocorrência
-- Adicione callouts do Obsidian para dicas importantes:
+### Estrutura das seções
+- **Seções curtas e escaneáveis** — máximo 5-8 linhas por bloco
+- **Um conceito por subseção** — se a aula fala sobre 5 conceitos, crie 5 subseções \
+separadas com `##` ou `###`, cada uma com sua explicação breve
+- **Bullet points curtos** — use listas com termos em **negrito** seguidos de explicação
+- **Listas de checagem** — use ✅ e ❌ para indicar "foco do curso" vs "fora do escopo"
+
+### Estrutura obrigatória do documento
+
+```
+[frontmatter YAML — não alterar]
+[callout de navegação — se existir]
+---
+# 📚 Visão Geral da Aula
+[1-2 parágrafos resumindo o tema central]
+---
+# 🎯 Objetivos / O que será aprendido
+[lista de bullet points]
+---
+# 🧠 [Seções de conteúdo com emojis]
+[conteúdo organizado por tópicos, com subsections ###]
+[cada conceito em sua própria subseção]
+[blocos de código quando houver comandos/código]
+---
+# 🧾 Resumo da Aula
+[3-5 bullet points com as lições principais]
+---
+# 🔁 Perguntas para Revisão
+[3-5 perguntas numeradas para fixação]
+---
+# ✍️ Anotações
+> [!note] Espaço para suas anotações
+>
+> -
+> -
+> -
+```
+
+### Enriquecimento
+- **Termos-chave** em negrito na primeira ocorrência
+- **Blocos de código** (`bash`, `yaml`, `dockerfile`, etc.) quando a aula mencionar comandos
+- **Callouts do Obsidian** quando agregar valor:
   - `> [!tip]` para dicas práticas
-  - `> [!warning]` para armadilhas comuns
-  - `> [!example]` para exemplos extras
-  - `> [!question]` para perguntas de revisão
-- Ao final, antes de "## Anotações", inclua:
-  - `## Pontos-chave` com 3-5 bullet points resumindo a aula
-  - `## Perguntas de revisão` com 2-3 perguntas para fixação
+  - `> [!warning]` para pontos de atenção
+  - `> [!info]` para conceitos fundamentais
+  - `> [!example]` para exemplos e analogias
+- Se a aula apresentar uma pessoa (instrutor), crie uma seção `# 👨‍🏫 Sobre o Instrutor`
 
 ### O que NÃO fazer
-- Não invente informações que contradizem a transcrição
-- Não remova conteúdo relevante da transcrição original
+- Não use parágrafos longos — quebre em blocos curtos
+- Não use a seção `## Transcrição` — reorganize todo o conteúdo por tópicos
 - Não altere o frontmatter YAML
-- Não adicione código incorreto ou desatualizado
-- Não mude o idioma da nota
+- Não adicione código incorreto ou inventado
+- Não use o formato TL;DR — use `# 📚 Visão Geral da Aula` no lugar
 """
 
 ENRICH_USER_TEMPLATE = """\
@@ -95,9 +139,9 @@ ENRICH_USER_TEMPLATE = """\
 
 ---
 
-Reescreva esta nota mantendo o frontmatter YAML intacto, \
-reorganizando com foco educativo e adicionando blocos de código \
-e exemplos práticos condizentes com o tema da aula."""
+Reescreva esta nota seguindo o formato visual com emojis nos headings, \
+separadores entre seções, blocos curtos e escaneáveis. \
+Reorganize TODO o conteúdo por tópicos — não mantenha a seção "## Transcrição"."""
 
 
 # ─── Providers ──────────────────────────────────────────────────────────────
@@ -219,7 +263,169 @@ class ClaudeProvider(LLMProvider):
         return data["content"][0]["text"]
 
 
-# ─── Registry de Providers ──────────────────────────────────────────────────
+class GroqProvider(LLMProvider):
+    """Provider via Groq API (OpenAI-compatible).
+
+    Groq usa LPUs (Language Processing Units) para inferência ultra-rápida
+    de modelos open source. Tem tier gratuito sem cartão de crédito.
+
+    Modelos recomendados:
+    - llama-3.3-70b-versatile (padrão, melhor qualidade)
+    - llama-3.1-8b-instant (mais rápido)
+    - deepseek-r1-distill-llama-70b (raciocínio/código)
+    """
+
+    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "llama-3.3-70b-versatile",
+    ):
+        raw_key = api_key or os.getenv("GROQ_API_KEY")
+        self.api_key = raw_key.strip().strip('"').strip("'") if raw_key else None
+        self.model = model
+        if not self.api_key:
+            raise ValueError(
+                "GROQ_API_KEY não encontrada. "
+                "Obtenha em console.groq.com e defina via --api-key ou no .env."
+            )
+
+    def name(self) -> str:
+        return f"groq/{self.model}"
+
+    def complete(self, system: str, user: str) -> str:
+        import requests
+
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            resp = requests.post(
+                self.GROQ_API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "temperature": 0.3,
+                    "max_completion_tokens": 8192,
+                },
+                timeout=300,
+            )
+
+            # Rate limit — espera e tenta novamente
+            if resp.status_code == 429 and attempt < max_retries:
+                retry_after = resp.headers.get("retry-after", "60")
+                wait = min(int(float(retry_after)), 120)
+                print(f"\n   ⏳ Rate limit atingido. Aguardando {wait}s... ", end="", flush=True)
+                time.sleep(wait)
+                print("retomando")
+                continue
+
+            if not resp.ok:
+                try:
+                    error_data = resp.json()
+                    error_msg = error_data.get("error", {}).get("message", resp.text[:500])
+                except Exception:
+                    error_msg = resp.text[:500]
+
+                if resp.status_code == 429:
+                    raise RuntimeError(
+                        f"Groq rate limit excedido após {max_retries} tentativas. "
+                        "Aumente --delay ou tente novamente amanhã (limites resetam diariamente)."
+                    )
+                raise RuntimeError(f"Groq API {resp.status_code}: {error_msg}")
+
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+
+        raise RuntimeError("Groq: número máximo de tentativas excedido.")
+
+
+class GeminiProvider(LLMProvider):
+    """Provider via Google Gemini API (OpenAI-compatible endpoint).
+
+    Tier gratuito sem cartão de crédito. API key em aistudio.google.com.
+
+    Modelos recomendados:
+    - gemini-2.5-flash (padrão, melhor custo-benefício no free tier)
+    - gemini-2.5-pro (mais capaz, limite menor: 5 RPM / 100 RPD)
+    - gemini-2.5-flash-lite (mais leve, limites mais altos)
+    """
+
+    GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gemini-2.5-flash",
+    ):
+        raw_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.api_key = raw_key.strip().strip('"').strip("'") if raw_key else None
+        self.model = model
+        if not self.api_key:
+            raise ValueError(
+                "GEMINI_API_KEY não encontrada. "
+                "Obtenha em aistudio.google.com e defina via --api-key ou no .env."
+            )
+
+    def name(self) -> str:
+        return f"gemini/{self.model}"
+
+    def complete(self, system: str, user: str) -> str:
+        import requests
+
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            resp = requests.post(
+                self.GEMINI_API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "temperature": 0.3,
+                    "max_completion_tokens": 8192,
+                },
+                timeout=300,
+            )
+
+            # Rate limit — espera e tenta novamente
+            if resp.status_code == 429 and attempt < max_retries:
+                retry_after = resp.headers.get("retry-after", "60")
+                wait = min(int(float(retry_after)), 120)
+                print(f"\n   ⏳ Rate limit atingido. Aguardando {wait}s... ", end="", flush=True)
+                time.sleep(wait)
+                print("retomando")
+                continue
+
+            if not resp.ok:
+                try:
+                    error_data = resp.json()
+                    error_msg = error_data.get("error", {}).get("message", resp.text[:500])
+                except Exception:
+                    error_msg = resp.text[:500]
+
+                if resp.status_code == 429:
+                    raise RuntimeError(
+                        f"Gemini rate limit excedido após {max_retries} tentativas. "
+                        "Aumente --delay ou tente novamente amanhã."
+                    )
+                raise RuntimeError(f"Gemini API {resp.status_code}: {error_msg}")
+
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+
+        raise RuntimeError("Gemini: número máximo de tentativas excedido.")
 
 
 def create_provider(
@@ -231,9 +437,9 @@ def create_provider(
     """Cria um provider de LLM pelo nome.
 
     Args:
-        provider_name: "ollama" ou "claude"
+        provider_name: "ollama", "claude", "groq" ou "gemini"
         model: Modelo a usar (padrão depende do provider)
-        api_key: API key (necessário para claude)
+        api_key: API key (necessário para claude, groq e gemini)
         base_url: URL base (para ollama customizado)
     """
     if provider_name == "ollama":
@@ -252,10 +458,26 @@ def create_provider(
             kwargs["api_key"] = api_key
         return ClaudeProvider(**kwargs)
 
+    elif provider_name == "groq":
+        kwargs = {}
+        if model:
+            kwargs["model"] = model
+        if api_key:
+            kwargs["api_key"] = api_key
+        return GroqProvider(**kwargs)
+
+    elif provider_name == "gemini":
+        kwargs = {}
+        if model:
+            kwargs["model"] = model
+        if api_key:
+            kwargs["api_key"] = api_key
+        return GeminiProvider(**kwargs)
+
     else:
         raise ValueError(
             f"Provider '{provider_name}' não suportado. "
-            "Use 'ollama' ou 'claude'."
+            "Use 'ollama', 'claude', 'groq' ou 'gemini'."
         )
 
 

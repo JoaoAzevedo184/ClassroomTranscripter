@@ -9,7 +9,7 @@ Ferramenta CLI que extrai transcrições de cursos da Udemy e transforma em mate
 python -m udemy_transcripter --url "https://udemy.com/course/meu-curso/" --format obsidian
 
 # 2. Enriquece com IA (código, exemplos, estrutura educativa)
-python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider ollama
+python -m udemy_transcripter --enrich ./udemy_transcripts/MeuCurso --provider groq
 ```
 
 ## Instalação
@@ -56,52 +56,90 @@ UDEMY_COOKIES='access_token=xxx; cf_clearance=yyy; client_id=zzz; ...'
 > ⚠️ Nunca compartilhe seus cookies. Eles dão acesso à sua conta.
 > Cookies expiram periodicamente — se der erro 403, gere novos.
 
-### API Key da Anthropic (opcional — apenas para enriquecimento com Claude)
+### API Key do Groq (recomendado para enriquecimento)
 
-Necessário **somente** se quiser usar o Claude como provider de IA no `--enrich`. Se usar Ollama (local), não precisa de API key.
+O Groq é a opção recomendada para enriquecimento: **gratuito**, ultra-rápido, e sem cartão de crédito.
+
+**Como obter:**
+
+1. Acesse [console.groq.com](https://console.groq.com)
+2. Crie conta (pode ser com Google)
+3. Vá em **API Keys** → **Create API Key**
+4. Copie a chave (começa com `gsk_`)
+
+**Adicione ao `.env`:**
+
+```env
+GROQ_API_KEY=gsk_sua_chave_aqui
+```
+
+**Limites do tier gratuito:**
+
+| Modelo | Tokens/min | Tokens/dia |
+|--------|:---:|:---:|
+| `llama-3.3-70b-versatile` | ~6.000 | ~500.000 |
+| `llama-3.1-8b-instant` | ~30.000 | maior |
+| `deepseek-r1-distill-llama-70b` | ~6.000 | ~500.000 |
+
+**O que acontece se atingir o limite?** A API retorna erro 429 e o enricher automaticamente espera e tenta novamente. Se o limite diário for atingido, os limites **resetam no dia seguinte** — não precisa pagar. Basta rodar o comando de novo; os arquivos já enriquecidos são pulados automaticamente.
+
+Para 127 aulas com o modelo 70B, pode levar 2-3 dias no tier gratuito. Dicas para otimizar:
+
+- Use `--delay 5` para espaçar as chamadas e evitar bater no limite por minuto
+- Use `--model llama-3.1-8b-instant` que tem limites mais altos (qualidade um pouco menor)
+- Se quiser tudo de uma vez, o Developer tier ($0 fixo, pay-as-you-go) tem 10x mais limites
+
+### API Key do Google Gemini (opcional — alternativa gratuita)
+
+Outro provider gratuito sem cartão. Usa modelos proprietários do Google com qualidade alta.
+
+**Como obter:**
+
+1. Acesse [aistudio.google.com](https://aistudio.google.com)
+2. Faça login com conta Google
+3. Clique em **Get API Key** → **Create API Key**
+4. Copie a chave (começa com `AIzaSy`)
+
+**Adicione ao `.env`:**
+
+```env
+GEMINI_API_KEY=AIzaSy_sua_chave_aqui
+```
+
+**Limites do tier gratuito:**
+
+| Modelo | RPM | RPD |
+|--------|:---:|:---:|
+| `gemini-2.5-flash` (padrão) | 10 | 500 |
+| `gemini-2.5-pro` | 5 | 100 |
+| `gemini-2.5-flash-lite` | 15 | 1.000 |
+
+Limites resetam à meia-noite (horário do Pacífico). Mesma lógica do Groq: se atingir, espere o dia seguinte e rode novamente.
+
+### API Key da Anthropic (opcional — para enriquecimento com Claude)
+
+Necessário **somente** se quiser usar o Claude como provider. Requer créditos pagos.
 
 **Como obter:**
 
 1. Acesse [console.anthropic.com](https://console.anthropic.com)
 2. Crie uma conta ou faça login
 3. Vá em **Settings** → **API Keys** → **Create Key**
-4. Copie a chave gerada (começa com `sk-ant-`)
-
-> ⚠️ A chave só é exibida uma vez. Guarde em lugar seguro.
-
-**Adicione ao `.env`:**
+4. Copie a chave (começa com `sk-ant-`)
+5. Adicione créditos em **Plans & Billing** (mínimo $5)
 
 ```env
-UDEMY_COOKIES='sua_cookie_string_aqui'
 ANTHROPIC_API_KEY=sk-ant-api03-sua-chave-aqui
 ```
 
-**Ou passe diretamente na CLI (sem salvar no `.env`):**
+### Resumo dos providers
 
-```bash
-python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
-  --provider claude \
-  --api-key sk-ant-api03-sua-chave-aqui
-```
-
-**Ordem de resolução da API key:**
-
-| Prioridade | Fonte |
-|:---:|---|
-| 1 | Flag `--api-key` na CLI |
-| 2 | `ANTHROPIC_API_KEY` no `.env` |
-| 3 | Variável de ambiente `ANTHROPIC_API_KEY` do sistema |
-
-**Modelos disponíveis:**
-
-| Modelo | Velocidade | Qualidade | Custo |
-|--------|:---:|:---:|:---:|
-| `claude-sonnet-4-20250514` (padrão) | Médio | Alta | ~$3/MTok |
-| `claude-haiku-4-5-20251001` | Rápido | Boa | ~$1/MTok |
-| `claude-opus-4-6` | Lento | Máxima | ~$15/MTok |
-
-Custo estimado para um curso com ~100 aulas: **$0.50–$2.00** com Sonnet.
+| Provider | Custo | Velocidade | Qualidade | Setup |
+|----------|:---:|:---:|:---:|---|
+| **Groq** | Gratuito | Ultra-rápido | Alta | API key em console.groq.com |
+| **Gemini** | Gratuito | Rápido | Alta | API key em aistudio.google.com |
+| **Ollama** | Gratuito | Lento (local) | Boa | `ollama pull llama3.1` |
+| **Claude** | ~$0.50–2/curso | Rápido | Excelente | API key + créditos pagos |
 
 ## Uso
 
@@ -136,54 +174,54 @@ python -m udemy_transcripter \
 Transforma transcrições brutas em material de estudo completo: blocos de código, exemplos práticos, estrutura educativa e perguntas de revisão.
 
 ```bash
-# Com Ollama (local, gratuito)
+# Com Groq (gratuito, recomendado)
 python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider groq
+
+# Com modelo mais rápido do Groq (limites mais altos)
+python -m udemy_transcripter \
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider groq --model llama-3.1-8b-instant
+
+# Com delay maior para não bater rate limit
+python -m udemy_transcripter \
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider groq --delay 5
+
+# Com Ollama (local, gratuito, mais lento)
+python -m udemy_transcripter \
+  --enrich "./udemy_transcripts/MeuCurso" \
   --provider ollama
 
-# Com modelo específico do Ollama
+# Com Gemini (gratuito, modelos Google)
 python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
-  --provider ollama --model qwen2.5:14b
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider gemini
 
-# Com Claude API (precisa de ANTHROPIC_API_KEY)
+# Gemini com modelo mais capaz (limite menor: 100 RPD)
 python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider gemini --model gemini-2.5-pro --delay 10
+
+# Com Claude API (precisa de créditos)
+python -m udemy_transcripter \
+  --enrich "./udemy_transcripts/MeuCurso" \
   --provider claude
-
-# Com Claude e modelo econômico
-python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
-  --provider claude --model claude-haiku-4-5-20251001
 
 # Preview sem alterar nenhum arquivo
 python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
-  --provider ollama --dry-run
-
-# Ollama rodando em outra máquina da rede
-python -m udemy_transcripter \
-  --enrich ./udemy_transcripts/MeuCurso \
-  --provider ollama --ollama-url http://192.168.1.100:11434
+  --enrich "./udemy_transcripts/MeuCurso" \
+  --provider groq --dry-run
 ```
-
-**Comparação de providers:**
-
-| | Ollama | Claude |
-|---|---|---|
-| **Custo** | Gratuito | ~$0.50–2.00/curso |
-| **Privacidade** | 100% local | Dados vão para a API |
-| **Velocidade** | Depende do hardware | Rápido |
-| **Qualidade** | Boa (modelos 7B+) | Excelente |
-| **Setup** | `ollama pull llama3.1` | API key no `.env` |
 
 **Comportamento do enricher:**
 
 - Arquivos já enriquecidos são **pulados automaticamente** (idempotente)
+- Se o Groq retornar rate limit (429), o enricher **espera automaticamente** e retenta
+- Se o limite diário for atingido, rode novamente no dia seguinte — continua de onde parou
 - Arquivos especiais (`_MOC.md`, `_index.md`) são ignorados
-- Frontmatter YAML, navegação e anotações são preservados
 - Cada arquivo recebe marcador `<!-- enriched-by: provider/model -->`
-- Se interrompido, rode novamente — continua de onde parou
 
 ### Pipeline completo (exemplo real)
 
@@ -196,10 +234,10 @@ python -m udemy_transcripter \
   --url "https://udemy.com/course/docker-zero-a-profissional/" \
   --format obsidian --merge --lang pt
 
-# 3. Enriquecer com IA
+# 3. Enriquecer com IA (pode levar 2-3 dias no tier gratuito do Groq)
 python -m udemy_transcripter \
   --enrich "./udemy_transcripts/Docker Zero a Profissional" \
-  --provider ollama --model llama3.1
+  --provider groq --delay 5
 
 # 4. Abrir no Obsidian e estudar 🎉
 ```
@@ -263,7 +301,7 @@ result = download_transcripts(
 )
 
 # Enriquecimento
-provider = create_provider("ollama", model="llama3.1")
+provider = create_provider("groq", api_key="gsk_...")
 enrich_directory(Path(result.output_dir), provider)
 ```
 
@@ -287,9 +325,9 @@ enrich_directory(Path(result.output_dir), provider)
 | Flag | Descrição |
 |------|-----------|
 | `--enrich DIR` | Diretório com notas `.md` para enriquecer |
-| `--provider` | `ollama` (padrão) ou `claude` |
-| `--model` | Modelo (ex: `llama3.1`, `claude-sonnet-4-20250514`) |
-| `--api-key` | API key da Anthropic (ou use `.env`) |
+| `--provider` | `ollama` (padrão), `groq`, `gemini` ou `claude` |
+| `--model` | Modelo (ex: `llama-3.3-70b-versatile`, `llama3.1`) |
+| `--api-key` | API key (ou use `.env`) |
 | `--ollama-url` | URL do Ollama (padrão: `http://localhost:11434`) |
 | `--delay` | Delay entre chamadas em segundos (padrão: `1.0`) |
 | `--dry-run` | Preview sem alterar arquivos |
@@ -312,14 +350,14 @@ udemy_transcripter/
 │   ├── client.py              # Cliente HTTP (Cloudflare bypass)
 │   ├── config.py              # Constantes e carregamento de .env
 │   ├── downloader.py          # Download e salvamento
-│   ├── enricher.py            # Enriquecimento com IA (Ollama / Claude)
+│   ├── enricher.py            # Enriquecimento com IA (Groq / Ollama / Claude)
 │   ├── exceptions.py          # Exceções customizadas
 │   ├── formatters.py          # Formatadores (txt, obsidian)
 │   ├── models.py              # Dataclasses do domínio
 │   ├── setup.py               # Configuração interativa do .env
 │   ├── utils.py               # Funções utilitárias
 │   └── vtt.py                 # Parser de legendas WebVTT
-├── tests/                     # 63 testes unitários
+├── tests/                     # 66 testes unitários
 │   ├── test_client.py
 │   ├── test_config.py
 │   ├── test_enricher.py
@@ -339,6 +377,24 @@ udemy_transcripter/
 pip install -e ".[dev]"
 pytest -v
 ```
+
+## FAQ
+
+### O Groq é realmente gratuito?
+
+Sim. O tier gratuito não requer cartão de crédito. Os limites de tokens resetam diariamente. Para a maioria dos cursos, 2-3 dias são suficientes.
+
+### Atingi o rate limit do Groq. O que faço?
+
+Espere até o dia seguinte — os limites resetam automaticamente. Rode o mesmo comando de novo; os arquivos já processados serão pulados. O enricher também tenta automaticamente esperar quando recebe erro 429.
+
+### Posso misturar providers?
+
+Sim. Rode metade com Groq gratuito e, se quiser mais qualidade em aulas específicas, re-enriqueça com Claude (delete o marcador `<!-- enriched-by: -->` do arquivo para forçar reprocessamento).
+
+### A qualidade do Groq é boa?
+
+O Groq roda os mesmos modelos open source (Llama 3.3 70B, DeepSeek R1) — só mais rápido. A qualidade é a mesma de rodar no Ollama, mas em 3-5s em vez de 30-60s.
 
 ## Notas
 
