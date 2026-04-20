@@ -1,6 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Ambiente
 .env
-udemy_transcripts
-udemy_transcripter.egg-info
-venv
-.idea
-__pycache__
+.env.local
+
+# Outputs do projeto
+transcripts/
+udemy_transcripts/
+dio_transcripts/
+alura_transcripts/
+dio_videos/
+
+# macOS / Linux
+.DS_Store
+*~

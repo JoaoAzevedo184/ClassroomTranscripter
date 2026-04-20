@@ -1,68 +1,83 @@
-# 🎓 Udemy Transcripter
+# 🎓 Classroom Transcripter
 
-Ferramenta CLI que extrai transcrições de cursos da Udemy e transforma em material de estudo com IA.
+Ferramenta CLI que extrai transcrições de cursos **Udemy, DIO e Alura** e transforma em material de estudo com IA.
 
-**Pipeline:** `download` → `format` → `enrich`
+**Pipeline:** `download/transcribe` → `format` → `enrich`
+
+> 🚧 **Em refatoração.** Esta versão (v0.2.0) é o esqueleto multi-source. Para a versão estável só-Udemy, veja `main` anteriormente (ex-`UdemyTranscripter`). Acompanhe o progresso em [`docs/refactor-plan.md`](docs/refactor-plan.md).
 
 ## Quick Start
 
 ```bash
-# Instalar
-git clone https://github.com/JoaoAzevedo184/UdemyTranscripter.git
-cd UdemyTranscripter
-pip install -e .
+git clone https://github.com/JoaoAzevedo184/ClassroomTranscripter.git
+cd ClassroomTranscripter
+pip install -e ".[dev]"
+cp .env.example .env   # preencha o que você vai usar
+```
 
-# Configurar cookies da Udemy (uma vez)
-python -m udemy_transcripter --setup
+## Comandos por plataforma
 
-# Baixar transcrições formatadas para Obsidian
-python -m udemy_transcripter \
-  --url "https://udemy.com/course/meu-curso/" \
-  --format obsidian --merge
+Cada plataforma tem o próprio CLI com flags específicas. O comando umbrella `classroom` aceita qualquer um deles como subcomando.
 
-# Enriquecer com IA (Groq gratuito)
-python -m udemy_transcripter \
-  --enrich "./udemy_transcripts/MeuCurso" \
-  --provider groq
+### Udemy
+
+```bash
+classroom-udemy --url "https://udemy.com/course/meu-curso/" --format obsidian --merge
+# ou
+classroom udemy --url "..." --format obsidian
+```
+
+### DIO (Whisper local em cima dos .mp4 que você baixou)
+
+```bash
+classroom-dio --video-dir ~/dio_videos/jornada-node --whisper-model small --format obsidian
+```
+
+### Alura
+
+```bash
+classroom-alura --url "https://cursos.alura.com.br/course/..." --format obsidian
+```
+
+### Enriquecer com IA (funciona em qualquer pasta gerada)
+
+```bash
+classroom-enrich ./transcripts/MeuCurso --provider groq
 ```
 
 ## Providers de IA
 
 | Provider | Custo | Velocidade | Setup |
-|----------|:---:|:---:|---|
+|---|---|---|---|
 | **Groq** | Gratuito | Ultra-rápido | [console.groq.com](https://console.groq.com) |
 | **Gemini** | Gratuito | Rápido | [aistudio.google.com](https://aistudio.google.com) |
 | **Ollama** | Gratuito | Local | `ollama pull llama3.1` |
 | **Claude** | Pago | Rápido | [console.anthropic.com](https://console.anthropic.com) |
 
+## Arquitetura
+
+Três camadas: `core/` (agnóstico) → `sources/{udemy,dio,alura}/` (plataforma) → `cli/` (interface).
+
+Veja [`docs/arquitetura.md`](docs/arquitetura.md) pro racional completo.
+
+```
+src/classroom_transcripter/
+├── core/              # models, formatters, enricher, vtt (compartilhado)
+├── sources/           # udemy/, dio/, alura/ (implementam TranscriptSource)
+└── cli/               # um CLI por plataforma + enrich
+```
+
 ## Documentação
 
 | Documento | Conteúdo |
-|-----------|----------|
+|---|---|
+| [Arquitetura](docs/arquitetura.md) | Como o projeto é organizado |
+| [Plano de Refatoração](docs/refactor-plan.md) | Checklist das 7 fases |
 | [Configuração](docs/configuracao.md) | Cookies, API keys, `.env` |
-| [Uso](docs/uso.md) | Download, enriquecimento, pipeline completo |
-| [Obsidian](docs/obsidian.md) | Formato de saída, estrutura, estilo das notas |
-| [Referência](docs/referencia.md) | Todas as flags da CLI, uso como biblioteca |
-| [FAQ](docs/faq.md) | Perguntas frequentes e troubleshooting |
-
-## Estrutura do projeto
-
-```
-udemy_transcripter/
-├── udemy_transcripter/        # Pacote principal
-│   ├── cli.py                 # Interface de linha de comando
-│   ├── client.py              # Cliente HTTP (Cloudflare bypass)
-│   ├── downloader.py          # Download e salvamento
-│   ├── enricher.py            # Enriquecimento com IA
-│   ├── formatters.py          # Formatadores (txt, obsidian)
-│   ├── vtt.py                 # Parser de legendas WebVTT
-│   └── ...
-├── tests/                     # 69 testes unitários
-├── docs/                      # Documentação
-├── .env.example
-├── pyproject.toml
-└── README.md
-```
+| [Uso](docs/uso.md) | Pipeline completo |
+| [Udemy](docs/sources/udemy.md) | Setup específico |
+| [DIO](docs/sources/dio.md) | Whisper local, organização dos vídeos |
+| [Alura](docs/sources/alura.md) | Login e limitações |
 
 ## Testes
 
@@ -71,9 +86,18 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
+## Status da refatoração
+
+- [x] Fase 1 — Esqueleto multi-source
+- [ ] Fase 2 — Migrar `core/`
+- [ ] Fase 3 — Extrair Udemy pra `sources/udemy/`
+- [ ] Fase 4 — Downloader genérico
+- [ ] Fase 5 — CLI modular
+- [ ] Fase 6 — Implementar DIO
+- [ ] Fase 7 — Implementar Alura
+
 ## Notas
 
-- Só funciona com cursos **que você comprou**
-- Depende das legendas/captions disponibilizadas pelo instrutor
-- Cookies expiram — se der 403, copie novos do navegador
-- Respeite os termos de uso da Udemy (uso pessoal para estudo)
+- **Udemy/Alura:** só funciona com cursos **que você comprou**.
+- **DIO:** você precisa baixar os .mp4 separadamente antes de rodar a transcrição.
+- Respeite os termos de uso das plataformas (uso pessoal para estudo).
