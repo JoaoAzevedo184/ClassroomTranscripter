@@ -3,13 +3,24 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "udemy-transcripter"
-version = "1.0.0"
-description = "Extrai transcrições/legendas de cursos da Udemy"
+name = "classroom-transcripter"
+version = "1.1.0"
+description = "Extrai transcrições de cursos online (Udemy e mais) e converte em material de estudo com IA"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "João Victor Azevedo" }]
+keywords = ["udemy", "transcripter", "obsidian", "ai", "study", "classroom"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+]
 
 dependencies = [
     "curl_cffi>=0.7",
@@ -25,7 +36,14 @@ dev = [
 ]
 
 [project.scripts]
+classroom-transcripter = "udemy_transcripter.cli:main"
+# Alias legado mantido para compatibilidade
 udemy-transcripter = "udemy_transcripter.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/JoaoAzevedo184/ClassroomTranscripter"
+Repository = "https://github.com/JoaoAzevedo184/ClassroomTranscripter"
+Issues = "https://github.com/JoaoAzevedo184/ClassroomTranscripter/issues"
 
 [tool.setuptools.packages.find]
 include = ["udemy_transcripter*"]

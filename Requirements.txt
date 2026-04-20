@@ -1,4 +1,14 @@
-curl_cffi
-requests
-python-dotenv
-google-generativeai
+# ─── Dependências de produção ─────────────────────────────────────────────
+# (equivalente a: pip install -e .)
+curl_cffi>=0.7
+requests>=2.28
+python-dotenv>=1.0
+
+# ─── Dependências de desenvolvimento ─────────────────────────────────────
+# (equivalente a: pip install -e ".[dev]")
+# pytest>=7.0
+# pytest-cov>=4.0
+# ruff>=0.4
+
+# Nota: google-generativeai foi removido — o provider Gemini usa a
+# API OpenAI-compatible via requests, sem SDK proprietário.

@@ -1,4 +1,6 @@
 .env
 udemy_transcripts
+udemy_transcripter.egg-info
 venv
 .idea
+__pycache__
