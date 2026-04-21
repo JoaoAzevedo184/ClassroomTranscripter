@@ -1,18 +1,40 @@
-"""Modelos de domínio compartilhados entre todas as plataformas.
+"""Modelos de domínio — agnósticos de plataforma.
 
-Estas dataclasses são o "idioma comum" que todo `TranscriptSource` fala.
-Se Udemy, DIO e Alura devolvem tipos diferentes internamente, cada source
-é responsável por traduzir pra estes modelos aqui.
+Hierarquia:
+    Course  ⊃  Module  ⊃  Lecture  ⊃  Caption[]
+    Transcript  ⊃  TranscriptCue[]
+
+Filosofia dos nomes (purista, v0.2):
+    Section → Module      (vocabulário mais universal entre plataformas)
+    (novo) → Course       (adiciona contexto do curso inteiro)
+    (novo) → Transcript   (encapsula texto + timestamps — útil pro Whisper da DIO)
+    (novo) → TranscriptCue (trecho com timestamp)
+
+Compatibilidade com v0.1: NÃO mantida intencionalmente. Código que importava
+`Section` (agora `Module`) precisa ser atualizado junto.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
+
+
+# ─── Captions / transcrições ────────────────────────────────────────────────
+
+
+@dataclass
+class Caption:
+    """Legenda de uma aula (Udemy, Alura). Ponteiro pra um arquivo VTT remoto."""
+
+    locale: str
+    url: str
+    label: str
 
 
 @dataclass
 class TranscriptCue:
-    """Um trecho com timestamp. Usado quando a fonte expõe tempo (VTT, Whisper segments)."""
+    """Trecho de transcrição com timestamp (usado pelo Whisper da DIO e VTTs)."""
+
     start_seconds: float
     end_seconds: float
     text: str
@@ -20,43 +42,55 @@ class TranscriptCue:
 
 @dataclass
 class Transcript:
-    """Transcrição completa de uma aula, com ou sem timestamps."""
-    lecture_id: str
-    language: str  # "pt", "en", "es", ...
+    """Transcrição completa de uma aula, com ou sem timestamps.
+
+    Quando vem do Whisper (DIO) → `cues` preenchido.
+    Quando vem de VTT parseado (Udemy/Alura) → `cues` preenchido.
+    Quando vem de scraping sem timestamps → só `plain_text`.
+    """
+
+    lecture_id: int | str
+    language: str
     cues: list[TranscriptCue] = field(default_factory=list)
-    plain_text: str = ""  # quando a fonte só dá texto corrido (ex: scraping Alura)
+    plain_text: str = ""
 
     @property
     def has_timestamps(self) -> bool:
         return bool(self.cues)
 
 
+# ─── Estrutura de cursos ────────────────────────────────────────────────────
+
+
 @dataclass
 class Lecture:
-    """Uma aula individual. Pode ser vídeo, artigo, desafio, etc."""
-    id: str
+    """Aula individual (vídeo, artigo, desafio)."""
+
+    id: int | str
     title: str
-    order: int  # posição dentro do módulo
-    duration_seconds: int | None = None
-    kind: str = "video"  # "video" | "article" | "quiz" | "challenge"
-    source_url: str | None = None
-    # Campo genérico pra cada source guardar metadados proprietários
+    object_index: int
+    captions: list[Caption] = field(default_factory=list)
+    # Metadados específicos por plataforma (DIO guarda path do .mp4 aqui)
     metadata: dict = field(default_factory=dict)
 
 
 @dataclass
 class Module:
-    """Agrupamento de aulas (capítulo, seção, módulo — nomenclatura varia)."""
-    id: str
+    """Agrupamento de aulas (chapter na Udemy, módulo na DIO, etc.).
+
+    Antes chamado de `Section` — renomeado na Fase 2 pra vocabulário universal.
+    """
+
     title: str
-    order: int
+    index: int
     lectures: list[Lecture] = field(default_factory=list)
 
 
 @dataclass
 class Course:
     """Curso/bootcamp/trilha completo."""
-    id: str
+
+    id: int | str
     slug: str
     title: str
     platform: str  # "udemy" | "dio" | "alura"
@@ -65,16 +99,25 @@ class Course:
     instructor: str | None = None
     metadata: dict = field(default_factory=dict)
 
-    def iter_lectures(self):
-        for m in self.modules:
-            yield from m.lectures
+    def iter_lectures(self) -> Iterator[Lecture]:
+        for module in self.modules:
+            yield from module.lectures
+
+
+# ─── Resultado de execução ──────────────────────────────────────────────────
 
 
 @dataclass
 class DownloadResult:
-    """Resultado de uma operação de download/transcrição completa."""
-    course: Course
-    output_dir: Path
-    files_created: list[Path] = field(default_factory=list)
-    skipped: list[str] = field(default_factory=list)  # lecture_ids que falharam/pularam
-    errors: list[str] = field(default_factory=list)
+    """Estatísticas de um download/transcrição completo."""
+
+    course_title: str
+    course_id: int | str
+    slug: str
+    platform: str  # novo v0.2
+    total_modules: int  # era total_sections
+    total_lectures: int
+    downloaded: int
+    errors: int
+    output_dir: str
+    skipped: int = 0  # novo v0.2 — pro --resume

@@ -1,51 +1,64 @@
-"""Contrato base de um formatador de saída."""
+"""Interface base para formatadores de saída."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from classroom_transcripter.core.models import Course, Lecture, Transcript
+from classroom_transcripter.core.models import Lecture, Module
+from classroom_transcripter.core.utils import sanitize_filename
 
 
 class BaseFormatter(ABC):
-    """Todo formatter converte (Lecture + Transcript) em um arquivo no disco.
+    """Interface base para formatadores de saída.
 
-    Pode também gerar um arquivo "merged" (curso inteiro em um doc).
+    Trocas de vocabulário v0.1 → v0.2:
+        Section → Module  (parâmetros renomeados)
+        section → module
     """
 
-    #: extensão incluindo ponto, ex: ".md", ".txt"
-    extension: str = ""
+    @abstractmethod
+    def file_extension(self) -> str:
+        """Extensão dos arquivos gerados (ex: '.txt', '.md')."""
 
     @abstractmethod
     def format_lecture(
         self,
         lecture: Lecture,
-        transcript: Transcript,
-        *,
-        include_timestamps: bool = False,
+        module: Module,
+        transcript: str,
+        course_title: str,
+        slug: str,
+        prev_lecture: Lecture | None = None,
+        next_lecture: Lecture | None = None,
     ) -> str:
-        """Devolve o conteúdo textual de UMA aula formatada."""
+        """Formata o conteúdo de uma aula individual."""
 
     @abstractmethod
-    def format_course_merged(
+    def format_merged(
         self,
-        course: Course,
-        transcripts: dict[str, Transcript],
-        *,
-        include_timestamps: bool = False,
+        modules: list[Module],
+        transcripts: dict[int | str, str],
+        course_title: str,
+        total_downloaded: int,
     ) -> str:
-        """Devolve o curso inteiro em um único documento (feature `--merge`)."""
+        """Formata o arquivo mesclado com todo o curso."""
 
-    def write_lecture(
+    def save_extras(
         self,
-        lecture: Lecture,
-        transcript: Transcript,
-        output_path: Path,
-        *,
-        include_timestamps: bool = False,
-    ) -> Path:
-        """Helper padrão: chama format_lecture e grava no disco."""
-        content = self.format_lecture(lecture, transcript, include_timestamps=include_timestamps)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
-        return output_path
+        course_dir: Path,
+        modules: list[Module],
+        transcripts: dict[int | str, str],
+        course_title: str,
+        slug: str,
+    ) -> None:
+        """Hook pra salvar arquivos extras (MOC, índices, etc.). Default: no-op."""
+
+    def get_lecture_filename(self, lecture: Lecture) -> str:
+        name = f"{lecture.object_index:03d} - {sanitize_filename(lecture.title)}"
+        return f"{name}{self.file_extension()}"
+
+    def get_module_dirname(self, module: Module) -> str:
+        return f"{module.index:02d} - {sanitize_filename(module.title)}"
+
+    def get_merged_filename(self) -> str:
+        return f"_CURSO_COMPLETO{self.file_extension()}"

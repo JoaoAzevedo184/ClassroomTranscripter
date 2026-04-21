@@ -109,15 +109,15 @@ def test_course_iter_lectures_preserves_module_order() -> None:
         platform="udemy",
         modules=[
             Module(
-                id="m1", title="Módulo 1", order=1,
+                title="Módulo 1", index=1,
                 lectures=[
-                    Lecture(id="l1", title="A", order=1),
-                    Lecture(id="l2", title="B", order=2),
+                    Lecture(id="l1", title="A", object_index=1),
+                    Lecture(id="l2", title="B", object_index=2),
                 ],
             ),
             Module(
-                id="m2", title="Módulo 2", order=2,
-                lectures=[Lecture(id="l3", title="C", order=1)],
+                title="Módulo 2", index=2,
+                lectures=[Lecture(id="l3", title="C", object_index=1)],
             ),
         ],
     )
@@ -227,11 +227,11 @@ def test_create_provider_rejects_unknown() -> None:
 def test_get_formatter_returns_correct_class() -> None:
     from classroom_transcripter.core.formatters import (
         ObsidianFormatter,
-        TxtFormatter,
+        PlainTextFormatter,
         get_formatter,
     )
 
-    assert isinstance(get_formatter("txt"), TxtFormatter)
+    assert isinstance(get_formatter("txt"), PlainTextFormatter)
     assert isinstance(get_formatter("obsidian"), ObsidianFormatter)
 
     with pytest.raises(ValueError):

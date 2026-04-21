@@ -29,29 +29,23 @@ Estrutura física nova, sem lógica migrada ainda.
 
 ---
 
-## Fase 2 — Migrar `core/`
+## ✅ Fase 2 — Migrar `core/` (CONCLUÍDA)
 
-Move código agnóstico-de-plataforma do repo atual pro `core/`.
+- [x] `core/models.py` — modelos purista: `Course`, `Module`, `Lecture`, `Caption`, `Transcript`, `TranscriptCue`, `DownloadResult` (com `platform` e `skipped`)
+- [x] `core/exceptions.py` — hierarquia `TranscripterError` + alias `NoCaptionsError` retrocompatível
+- [x] `core/config.py` — Udemy (mantido) + DIO + Alura + Whisper + aliases v0.1
+- [x] `core/platforms.py` — `BasePlatform` + `UdemyPlatform`, `DioPlatform`, `AluraPlatform`
+- [x] `core/utils.py` — `extract_slug` usando `detect_platform` novo
+- [x] `core/vtt.py` — migrado + nova `vtt_to_transcript()` devolvendo `Transcript`
+- [x] `core/formatters/{base,txt,obsidian}.py` — split em 3 arquivos, `platform` dinâmico no frontmatter
+- [x] `core/enricher/base.py` — `LLMProvider` + `_post_with_retry` compartilhado
+- [x] `core/enricher/pipeline.py` — prompts + `enrich_file` + `enrich_directory`
+- [x] `core/enricher/providers/{ollama,claude,groq,gemini}.py` — 4 providers separados
+- [x] `core/enricher/__init__.py` — factory `create_provider` com lazy imports
+- [x] Testes migrados em `tests/core/`: config, models, platforms, utils, vtt, formatters, enricher
+- [x] **144 testes passando** (53 da Fase 1 + 91 novos da Fase 2)
 
-- [ ] `core/config.py` ← `udemy_transcripter/config.py`
-  - [ ] Adicionar variáveis novas: `DIO_VIDEO_DIR`, `WHISPER_MODEL`, `ALURA_EMAIL`, `ALURA_PASSWORD`
-- [ ] `core/utils.py` ← parte agnóstica de `udemy_transcripter/utils.py`
-  - [ ] Funções específicas da Udemy continuam em `sources/udemy/` (Fase 3)
-- [ ] `core/vtt.py` ← `udemy_transcripter/vtt.py`
-  - [ ] Adaptar retorno pra `list[TranscriptCue]` de `core.models`
-- [ ] `core/formatters/txt.py` ← parte TxtFormatter de `formatters.py`
-- [ ] `core/formatters/obsidian.py` ← parte ObsidianFormatter de `formatters.py`
-  - [ ] Adicionar campo `platform` no frontmatter
-- [ ] `core/enricher/pipeline.py` ← orquestração de `enricher.py`
-- [ ] `core/enricher/providers/{groq,gemini,ollama,claude}.py` ← um por provider
-- [ ] Migrar testes pra `tests/core/`:
-  - [ ] `tests/core/test_config.py`
-  - [ ] `tests/core/test_utils.py`
-  - [ ] `tests/core/test_vtt.py`
-  - [ ] `tests/core/test_formatters.py`
-  - [ ] `tests/core/test_enricher.py`
-
-**Critério de done:** todos os 69 testes originais passando nos novos paths.
+**Status:** 🟢 Concluída. Pronto para Fase 3.
 
 ---
 

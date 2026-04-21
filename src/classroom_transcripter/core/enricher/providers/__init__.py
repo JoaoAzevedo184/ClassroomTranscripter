@@ -1,1 +1,1 @@
-"""Implementações concretas de `AIProvider`. Imports são lazy via factory."""
+"""Providers concretos de LLM. Imports via factory em `core.enricher.create_provider`."""
