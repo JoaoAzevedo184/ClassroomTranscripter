@@ -1,17 +1,43 @@
-"""Parsing da resposta da API Udemy pra Course/Module/Lecture.
+"""Helpers de parsing específicos da API Udemy.
 
-MIGRAÇÃO (Fase 3):
------------------
-Extrair de `udemy_transcripter/downloader.py` (ou onde estiver) a lógica que:
-- Recebe o JSON do endpoint de curriculum da Udemy
-- Monta Course com seus Modules e Lectures
+O parsing de ITENS individuais (chapter/lecture/caption) já vive em
+`UdemyClient._parse_lecture` e `UdemyClient.get_curriculum` — esses métodos
+lidam diretamente com o formato paginado da API.
 
-Essa parte mistura-se com `downloader.py` atual — precisa ISOLAR o parsing
-da parte de I/O (download/salvamento). O I/O genérico vai pro core/downloader
-na Fase 4; o parsing específico da API Udemy fica aqui.
-
-Funções esperadas:
-- parse_course_payload(json_data, slug) -> Course
-- parse_captions_response(json_data) -> dict (para escolher língua/URL do VTT)
+Este módulo existe pra hospedar montagens de ALTO NÍVEL: combinar os pedaços
+(course_info + curriculum) num `Course` completo e agnóstico.
 """
-# TODO Fase 3: isolar parsing da Udemy aqui
+from __future__ import annotations
+
+from classroom_transcripter.core.models import Course, Module
+
+
+def build_course(
+    course_id: int,
+    title: str,
+    slug: str,
+    modules: list[Module],
+    *,
+    language: str | None = None,
+) -> Course:
+    """Monta um `Course` a partir das partes que o `UdemyClient` devolve.
+
+    Args:
+        course_id: ID numérico da Udemy.
+        title: título do curso.
+        slug: slug do curso (pra reconstruir URL pública depois).
+        modules: lista de módulos vinda de `UdemyClient.get_curriculum`.
+        language: código de idioma principal, se conhecido.
+
+    Returns:
+        Course com `platform="udemy"` e todos os módulos/aulas populados.
+    """
+    return Course(
+        id=course_id,
+        slug=slug,
+        title=title,
+        platform="udemy",
+        modules=modules,
+        language=language,
+        metadata={"api": "udemy"},
+    )

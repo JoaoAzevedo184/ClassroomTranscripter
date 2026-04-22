@@ -89,11 +89,11 @@ pytest -v
 ## Status da refatoração
 
 - [x] Fase 1 — Esqueleto multi-source
-- [x] Fase 2 — Migrar `core/` (144 testes verdes)
-- [ ] Fase 3 — Extrair Udemy pra `sources/udemy/`
-- [ ] Fase 4 — Downloader genérico
-- [ ] Fase 5 — CLI modular
-- [ ] Fase 6 — Implementar DIO
+- [x] Fase 2 — Migrar `core/` (144 testes)
+- [x] Fase 3 — Extrair Udemy pra `sources/udemy/` (178 testes)
+- [x] Fase 4 — Downloader genérico (198 testes)
+- [x] Fase 5 — CLI modular (228 testes)
+- [x] Fase 6 — Implementar DIO (273 testes)
 - [ ] Fase 7 — Implementar Alura
 
 ## Notas

@@ -28,6 +28,7 @@ Uso:
   classroom dio     [opções]        Transcrever bootcamp da DIO (Whisper local)
   classroom alura   [opções]        Transcrever curso da Alura
   classroom enrich  <dir> [opções]  Enriquecer transcripts com IA
+  classroom setup                   Configurar cookies Udemy no .env
 
 Use `classroom <subcomando> --help` pra ver opções de cada plataforma.
 """
@@ -54,6 +55,9 @@ def main() -> int:
     if subcommand == "enrich":
         from classroom_transcripter.cli.enrich_cli import main as enrich_main
         return enrich_main()
+    if subcommand == "setup":
+        from classroom_transcripter.cli.setup_cli import main as setup_main
+        return setup_main()
 
     print(f"Subcomando desconhecido: {subcommand!r}\n", file=sys.stderr)
     print(USAGE, file=sys.stderr)

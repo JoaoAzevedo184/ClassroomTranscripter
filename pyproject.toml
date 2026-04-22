@@ -76,6 +76,7 @@ classroom-udemy = "classroom_transcripter.cli.udemy_cli:main"
 classroom-dio = "classroom_transcripter.cli.dio_cli:main"
 classroom-alura = "classroom_transcripter.cli.alura_cli:main"
 classroom-enrich = "classroom_transcripter.cli.enrich_cli:main"
+classroom-setup = "classroom_transcripter.cli.setup_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/JoaoAzevedo184/ClassroomTranscripter"

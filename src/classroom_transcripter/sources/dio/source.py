@@ -1,9 +1,14 @@
-"""DioSource: implementação de `TranscriptSource` para DIO.
+"""`DioSource`: `TranscriptSource` baseado em Whisper local.
 
-Como DIO não expõe API de transcrição, a estratégia é:
-1. Usuário baixa os .mp4 (manualmente ou via outra ferramenta) numa pasta.
-2. DioSource varre a pasta (`video_finder`) e infere Course/Modules/Lectures.
-3. `fetch_transcript` roda Whisper localmente no arquivo correspondente.
+Fluxo (diferente de Udemy/Alura):
+    1. Usuário baixa .mp4 do DIO manualmente (ou via outra ferramenta).
+    2. Organiza em subpastas por módulo (convenção obrigatória).
+    3. `fetch_course(path)` descobre a estrutura via `video_finder`.
+    4. `fetch_transcript(lecture)` roda Whisper no arquivo que tá em
+       `lecture.metadata["file"]` (populado pelo video_finder).
+
+Como é 100% local, `authenticate()` é no-op.
+Pra retomar um download interrompido, use `--resume` do downloader genérico.
 """
 from __future__ import annotations
 
@@ -11,9 +16,13 @@ from pathlib import Path
 
 from classroom_transcripter.core.models import Course, Lecture, Transcript
 from classroom_transcripter.sources.base import TranscriptSource
+from classroom_transcripter.sources.dio.video_finder import discover_course
+from classroom_transcripter.sources.dio.whisper_engine import transcribe
 
 
 class DioSource(TranscriptSource):
+    """TranscriptSource pra DIO — Whisper local sobre .mp4 baixados."""
+
     name = "dio"
 
     def __init__(
@@ -25,29 +34,31 @@ class DioSource(TranscriptSource):
         """
         Args:
             whisper_model: tiny | base | small | medium | large.
-                           Padrão 'small' = bom equilíbrio qualidade/velocidade.
-            language: idioma das aulas pro Whisper.
+                           'small' é o melhor equilíbrio qualidade/velocidade
+                           no hardware típico de homelab.
+            language: código ISO do idioma falado nas aulas.
         """
         self.whisper_model = whisper_model
         self.language = language
 
     def authenticate(self) -> None:
-        """No-op: DIO só lê arquivos locais, não precisa de auth."""
+        """No-op: DIO só lê arquivos locais, não tem auth."""
         return None
 
     def fetch_course(self, identifier: str) -> Course:
-        """`identifier` aqui é um PATH pra pasta do bootcamp baixado.
+        """`identifier` é o path pra pasta do bootcamp baixado.
 
-        Ex: '/home/joao/dio_videos/formacao-java-backend'
+        A pasta DEVE ter subpastas (uma por módulo). Ver `video_finder` pra
+        detalhes da convenção.
         """
-        # from classroom_transcripter.sources.dio.video_finder import discover_course
-        # return discover_course(Path(identifier))
-        raise NotImplementedError("Implementar na Fase 6")
+        return discover_course(Path(identifier))
 
     def fetch_transcript(self, lecture: Lecture) -> Transcript:
-        """Roda Whisper no .mp4 que está em lecture.metadata['file']."""
-        # from classroom_transcripter.sources.dio.whisper_engine import transcribe
-        # media = Path(lecture.metadata["file"])
-        # return transcribe(media, lecture_id=lecture.id,
-        #                   model_name=self.whisper_model, language=self.language)
-        raise NotImplementedError("Implementar na Fase 6")
+        """Roda Whisper no arquivo em `lecture.metadata['file']`."""
+        media_path = Path(lecture.metadata["file"])
+        return transcribe(
+            media_path,
+            lecture_id=lecture.id,
+            model_name=self.whisper_model,
+            language=self.language,
+        )

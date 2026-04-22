@@ -49,63 +49,83 @@ Estrutura física nova, sem lógica migrada ainda.
 
 ---
 
-## Fase 3 — Extrair Udemy pra `sources/udemy/`
+## ✅ Fase 3 — Extrair Udemy pra `sources/udemy/` (CONCLUÍDA)
 
-- [ ] `sources/udemy/client.py` ← `udemy_transcripter/client.py` (imports atualizados)
-- [ ] `sources/udemy/parser.py` ← extraído de `downloader.py` (parsing da API)
-- [ ] `sources/udemy/source.py` — implementação de `UdemySource(TranscriptSource)`
-  - [ ] `authenticate()` valida cookie via `/users/me`
-  - [ ] `fetch_course(url_or_slug)` devolve `Course`
-  - [ ] `fetch_transcript(lecture)` devolve `Transcript` parseado via `core/vtt.py`
-  - [ ] `list_available_languages(lecture)` pra `--list-langs`
-- [ ] Migrar `tests/sources/udemy/test_client.py`
+- [x] `sources/udemy/client.py` — migrado do v0.1, usa `core.config.UDEMY_*` e `core.exceptions`
+  - `get_curriculum()` agora devolve `list[Module]` (era `list[Section]`)
+- [x] `sources/udemy/parser.py` — `build_course()` monta `Course` a partir das partes do client
+- [x] `sources/udemy/source.py` — `UdemySource(TranscriptSource)` completo:
+  - `authenticate()` valida cookie via `/users/me`
+  - `fetch_course(url_or_slug)` devolve `Course`
+  - `fetch_transcript(lecture)` escolhe caption + baixa VTT + parseia → `Transcript`
+  - `list_available_languages(lecture)` pra `--list-langs`
+  - `_client` lazy (facilita testes)
+- [x] `sources/udemy/__init__.py` — re-exports
+- [x] Testes: `tests/sources/udemy/test_client.py` (13), `test_source.py` (18), `test_parser.py` (3)
+- [x] **178 testes verdes** (144 da Fase 2 + 34 novos da Fase 3)
 
-**Critério de done:** `UdemySource` funcional com mocks; testes do cliente passando.
-
----
-
-## Fase 4 — Downloader genérico no `core/`
-
-Hoje o `downloader.py` mistura fluxo + parsing da Udemy. Separar:
-
-- [ ] Criar `core/downloader.py`:
-  ```python
-  def download_course(source: TranscriptSource, course: Course,
-                      formatter: BaseFormatter, output_dir: Path,
-                      *, include_timestamps=False, merge=False) -> DownloadResult:
-      ...
-  ```
-- [ ] Remover `udemy_transcripter/downloader.py` (virou genérico + parser.py)
-- [ ] Testes: `tests/core/test_downloader.py` com mock de `TranscriptSource`
-
-**Critério de done:** testes de integração Udemy passam usando `UdemySource` + downloader genérico.
+**Status:** 🟢 Concluída. Pronto para Fase 4 (downloader genérico usando `TranscriptSource`).
 
 ---
 
-## Fase 5 — CLI modular
+## ✅ Fase 4 — Downloader genérico (CONCLUÍDA)
 
-- [ ] `cli/udemy_cli.py` ← migrar flags Udemy de `cli.py` atual
-- [ ] `cli/enrich_cli.py` ← migrar flags `--enrich` de `cli.py` atual
-- [ ] `cli/main.py` dispatcher umbrella (já implementado na Fase 1)
-- [ ] Remover `udemy_transcripter/cli.py` antigo
-- [ ] README atualizado com novos comandos
+- [x] `core/downloader.py` — orquestra qualquer `TranscriptSource`:
+  - `download_course(source, course, ...)` — orquestração pura
+  - `download_by_identifier(source, identifier, ...)` — conveniência (faz `fetch_course` + download)
+  - `list_available_captions(source, course)` — lista idiomas disponíveis
+- [x] Features preservadas do v0.1:
+  - `--resume` (pula aulas cujo arquivo já existe)
+  - `--merge` (gera `_CURSO_COMPLETO.txt|.md`)
+  - Navegação prev/next pra wikilinks do Obsidian
+  - `_metadata.json` (+ campo `platform` na v0.2)
+- [x] Suporte DIO nativo: heurística `_lecture_is_available` reconhece tanto `captions` (Udemy/Alura) quanto `metadata["file"]` (DIO)
+- [x] Timestamps multi-fonte: `_transcript_to_text` sabe lidar com `cues` (Whisper/VTT) e `plain_text` (scraping)
+- [x] Testes `tests/core/test_downloader.py` (20) com `FakeSource` — valida integração completa sem HTTP
+- [x] **198 testes verdes** (178 da Fase 3 + 20 novos)
 
-**Critério de done:** `classroom-udemy --url ... --format obsidian` funciona end-to-end igual ao `python -m udemy_transcripter` antigo.
+**Status:** 🟢 Concluída. Todo o pipeline agnóstico tá pronto — Fase 5 já pode consumir `download_course(source, ...)` nos CLIs.
 
 ---
 
-## Fase 6 — Implementar DIO
+## ✅ Fase 5 — CLI modular (CONCLUÍDA)
 
-- [ ] `sources/dio/whisper_engine.py` ← copiar do repo `whisper-transcriber`
-  - [ ] Adaptar retorno pra `Transcript` de `core.models`
-  - [ ] Lazy import do `whisper` (pesado)
-- [ ] `sources/dio/video_finder.py` — descoberta de Course via convenção de pastas
-- [ ] `sources/dio/source.py` — `DioSource(TranscriptSource)`
-- [ ] `cli/dio_cli.py`
-- [ ] Testes com fixtures de pastas simuladas (`tmp_path`)
-- [ ] `docs/sources/dio.md` — como baixar os .mp4, organizar pastas, instalar Whisper
+- [x] `cli/udemy_cli.py` — CLI completo da Udemy consumindo `UdemySource` + `download_course`
+  - Todas as flags do v0.1: `--url`, `--cookie`, `--format`, `--lang`, `--merge`, `--resume`, `--list-langs`, `--timestamps`, `--setup`, `--debug`
+  - ObsidianFormatter recebe `platform="udemy"` automaticamente
+  - `--setup` delega pro `setup_cli.setup_env`
+- [x] `cli/enrich_cli.py` — CLI agnóstico de plataforma
+  - Captura `TranscripterError` (inclui `ProviderAPIKeyMissingError`) com mensagem amigável
+  - Forwards corretos: `--model`, `--ollama-url`, `--timeout`, `--delay`, `--dry-run`
+- [x] `cli/setup_cli.py` — NOVO na Fase 5, migra o `setup.py` do v0.1
+- [x] `cli/main.py` — dispatcher umbrella expandido com `setup`
+- [x] Entry points registrados: `classroom`, `classroom-udemy`, `classroom-dio`, `classroom-alura`, `classroom-enrich`, `classroom-setup`
+- [x] Testes novos (30): `tests/cli/test_udemy_cli.py`, `test_enrich_cli.py`, `test_main_dispatcher.py`
+- [x] **228 testes verdes** (198 da Fase 4 + 30 novos)
+- [x] Smoke manual: `classroom --help`, `classroom-udemy --help`, `classroom-enrich --help` funcionam após `pip install -e .`
 
-**Critério de done:** `classroom-dio --video-dir ./fixture-bootcamp` gera .md Obsidian corretos pra um mini-bootcamp de teste.
+**Status:** 🟢 Concluída. O pacote `udemy_transcripter/` v0.1 pode ser apagado do repo agora — `classroom-udemy` faz tudo que ele fazia.
+
+---
+
+## ✅ Fase 6 — Implementar DIO (CONCLUÍDA)
+
+- [x] `sources/dio/video_finder.py` — estrutura profunda obrigatória (uma subpasta por módulo)
+  - Natural sort (01, 02, ..., 10 na ordem certa)
+  - Prettify de nomes (`01-introducao` → `Introducao`)
+  - Aceita .mp4, .mkv, .webm, .mov, .m4a, .mp3, .wav
+  - Estrutura plana é ERRO (CourseNotFoundError com instruções)
+- [x] `sources/dio/whisper_engine.py` — wrapper do Whisper, SEM cache em disco
+  - Modelo carregado lazy + cacheado em memória via `lru_cache` (pro mesmo run)
+  - Converte segmentos do Whisper em `TranscriptCue[]`
+  - Estratégia de retomada: `--resume` do downloader genérico (evita retranscrever aulas que já viraram .md)
+- [x] `sources/dio/source.py` — `DioSource(TranscriptSource)`, `authenticate` é no-op
+- [x] `cli/dio_cli.py` — `classroom-dio --video-dir ... --whisper-model small --resume`
+- [x] Testes novos: `tests/sources/dio/test_video_finder.py` (17), `test_whisper_engine.py` (10), `test_source.py` (7), `tests/cli/test_dio_cli.py` (11)
+- [x] Teste de integração confirma: `DioSource` + `download_course` genérico + `--resume` funcionam juntos
+- [x] **273 testes verdes** (228 da Fase 5 + 45 novos)
+
+**Status:** 🟢 Concluída. A arquitetura `TranscriptSource` passou no "real-world test" — DIO (Whisper local, sem API, sem auth) funciona com o mesmo downloader genérico que a Udemy (API + VTT + Cloudflare).
 
 ---
 
