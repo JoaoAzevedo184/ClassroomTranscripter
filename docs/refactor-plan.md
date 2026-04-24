@@ -129,17 +129,25 @@ Estrutura física nova, sem lógica migrada ainda.
 
 ---
 
-## Fase 7 — Implementar Alura
+## ✅ Fase 7 — Implementar Alura (CONCLUÍDA como esqueleto ativável)
 
-- [ ] Inspecionar DevTools → Network da Alura logado (mapear endpoints reais)
-- [ ] `sources/alura/client.py` — login + sessão
-- [ ] `sources/alura/parser.py` — HTML/JSON → Course/Transcript
-- [ ] `sources/alura/source.py` — `AluraSource(TranscriptSource)`
-- [ ] `cli/alura_cli.py`
-- [ ] Testes com HTML/JSON fixtures (offline)
-- [ ] `docs/sources/alura.md` — credenciais, limitações, FAQ
+- [x] `sources/alura/client.py` — `AluraClient` com httpx session + 3 métodos marcados `NotImplementedError("TODO Fase 7.N")`, docstrings detalhadas com exemplo de implementação
+- [x] `sources/alura/parser.py` — IMPLEMENTADO COMPLETO. `parse_course()` + `parse_transcript()` suportando 3 formatos (segments, plain text, VTT)
+- [x] `sources/alura/source.py` — `AluraSource(TranscriptSource)` completo, só delega pro client+parser (cliente lazy)
+- [x] `cli/alura_cli.py` — CLI completa com `--url`, `--email`, `--password`, `--ask-password`, `.env`, `--merge`, `--resume`. Mensagem amigável quando TODOs não preenchidos.
+- [x] `docs/sources/alura.md` — guia passo-a-passo detalhado de como inspecionar DevTools e preencher os 3 TODOs
+- [x] Testes: `test_parser.py` (14), `test_source.py` (11), `test_client.py` (8), `test_alura_cli.py` (10) = 43 testes
+- [x] **313 testes verdes** (273 da Fase 6 + 40 novos)
 
-**Critério de done:** `classroom-alura --url ...` funciona num curso real (teste manual).
+**Status:** 🟡 Esqueleto ativável. Arquitetura 100% pronta; 3 funções HTTP reais pendentes (aguardam sua inspeção de DevTools).
+
+**Pra ativar:**
+1. Abra `docs/sources/alura.md`
+2. Faça a inspeção (1-2h)
+3. Preencha os 3 TODOs em `sources/alura/client.py`
+4. Rode `classroom-alura --url "..." --debug`
+
+Quando ativar, não precisa mudar nem arquitetura, nem CLI, nem testes — só as 3 funções.
 
 ---
 

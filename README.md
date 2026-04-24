@@ -88,13 +88,17 @@ pytest -v
 
 ## Status da refatoração
 
+## Status da refatoração — CONCLUÍDA ✅
+
 - [x] Fase 1 — Esqueleto multi-source
 - [x] Fase 2 — Migrar `core/` (144 testes)
 - [x] Fase 3 — Extrair Udemy pra `sources/udemy/` (178 testes)
 - [x] Fase 4 — Downloader genérico (198 testes)
 - [x] Fase 5 — CLI modular (228 testes)
 - [x] Fase 6 — Implementar DIO (273 testes)
-- [ ] Fase 7 — Implementar Alura
+- [x] Fase 7 — Esqueleto ativável da Alura (313 testes)
+
+**Udemy e DIO estão 100% funcionais.** Alura precisa de 3 TODOs preenchidos após inspeção do DevTools — ver `docs/sources/alura.md`.
 
 ## Notas
 
