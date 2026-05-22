@@ -1,15 +1,18 @@
 # 📝 Formato Obsidian
 
-## Saída do download (`--format obsidian`)
+O `ObsidianFormatter` gera notas `.md` otimizadas pra estudo, e funciona pra
+qualquer plataforma — o frontmatter e as tags refletem dinamicamente a origem
+(`platform: udemy` vs `platform: dio` vs `platform: alura`).
 
-O formatter Obsidian gera notas `.md` otimizadas para estudo:
+## Saída do download
 
-- **Frontmatter YAML** — funciona com Dataview (`course`, `section`, `tags`, `date`)
-- **Tags automáticas** — `#udemy`, `#curso/nome-do-curso`, `#secao/nome-da-secao`
-- **Navegação** — wikilinks `⬅ [[anterior]] | [[próxima]] ➡`
-- **MOC (Map of Content)** — `_MOC.md` com links para todas as notas
+- **Frontmatter YAML dinâmico** — `course`, `section`, `tags`, `date`,
+  `platform` (funciona com Dataview)
+- **Tags automáticas** — `#udemy`/`#dio`/`#alura`, `#curso/nome`, `#secao/nome`
+- **Navegação** — wikilinks `⬅ [[anterior]] | [[próxima]] ➡` (callout `[!tip]`)
+- **MOC (Map of Content)** — `_MOC.md` com links pra todas as notas
 - **Índice por seção** — `_index.md` com lista numerada de aulas
-- **Área de anotações** — espaço reservado para notas pessoais
+- **Área de anotações** — espaço reservado pra notas pessoais
 
 ---
 
@@ -18,7 +21,7 @@ O formatter Obsidian gera notas `.md` otimizadas para estudo:
 ```
 udemy_transcripts/
 └── Docker Zero a Profissional/
-    ├── _MOC.md                     # Map of Content (links para tudo)
+    ├── _MOC.md                     # Map of Content
     ├── _CURSO_COMPLETO.md          # (com --merge)
     ├── _metadata.json
     ├── 01 - Primeiros Passos/
@@ -31,11 +34,53 @@ udemy_transcripts/
         └── 028 - Criando seu primeiro Dockerfile.md
 ```
 
+DIO e Alura geram a mesma estrutura, mas em `dio_transcripts/` e
+`alura_transcripts/`.
+
+---
+
+## Frontmatter dinâmico por plataforma
+
+```yaml
+# Aula da Udemy
+---
+course: "Docker Zero a Profissional"
+section: "Primeiros Passos"
+lecture: 14
+udemy_id: 12345678
+platform: udemy
+date: 2026-05-21
+tags:
+  - udemy
+  - curso/docker-zero-a-profissional
+  - secao/primeiros-passos
+---
+
+# Aula da DIO
+---
+course: "Jornada Node"
+section: "Fundamentos"
+lecture: 1
+dio_id: 01-introducao.mp4
+platform: dio
+date: 2026-05-21
+tags:
+  - dio
+  - curso/jornada-node
+  - secao/fundamentos
+---
+```
+
+A chave `{platform}_id` é dinâmica — facilita queries no Dataview filtradas por
+plataforma.
+
 ---
 
 ## Estilo após enriquecimento
 
-Após rodar `--enrich`, as notas são transformadas em material didático visual:
+Após rodar `classroom-enrich`, as notas viram material didático visual:
+headings com emojis, seções escaneáveis, blocos de código, callouts e perguntas
+de revisão.
 
 ### Elementos visuais
 
@@ -43,26 +88,26 @@ Após rodar `--enrich`, as notas são transformadas em material didático visual
 |----------|-----------|
 | `# 📚 Visão Geral da Aula` | Resumo do tema em 1-2 parágrafos |
 | `# 🎯 Objetivos` | O que o aluno vai aprender |
-| `# 🧠 Conceitos` | Conteúdo principal organizado por tópicos |
+| `# 🧠 Conceitos` | Conteúdo principal por tópicos |
 | `# 👨‍🏫 Sobre o Instrutor` | Se a aula apresentar alguém |
-| `# 🧾 Resumo da Aula` | 3-5 bullet points com lições principais |
-| `# 🔁 Perguntas para Revisão` | 3-5 perguntas para fixação |
-| `# ✍️ Anotações` | Espaço vazio para o aluno |
+| `# 🧾 Resumo da Aula` | 3-5 bullets com lições principais |
+| `# 🔁 Perguntas para Revisão` | 3-5 perguntas pra fixação |
+| `# ✍️ Anotações` | Espaço vazio pro aluno |
 
 ### Callouts do Obsidian
 
 ```markdown
 > [!tip] Dica prática
-> Use Docker Compose para orquestrar múltiplos containers.
+> Use Docker Compose pra orquestrar múltiplos containers.
 
 > [!warning] Atenção
-> Não esqueça do .dockerignore para evitar enviar node_modules.
+> Não esqueça do .dockerignore pra evitar enviar node_modules.
 
 > [!info] Importante
 > Containers compartilham o kernel do host, diferente de VMs.
 
 > [!example] Exemplo
-> Uma aplicação com backend, banco e cache como 3 serviços no Compose.
+> Uma app com backend, banco e cache como 3 serviços no Compose.
 ```
 
 ### Separadores e escaneabilidade
@@ -70,8 +115,8 @@ Após rodar `--enrich`, as notas são transformadas em material didático visual
 - `---` entre todas as seções principais
 - Blocos curtos de 5-8 linhas (sem paredes de texto)
 - Um conceito por subseção `###`
-- Bullet points curtos com termos em **negrito**
-- ✅/❌ para indicar foco vs fora do escopo
+- Bullets curtos com termos em **negrito**
+- ✅/❌ pra indicar foco vs fora do escopo
 
 ---
 
@@ -82,11 +127,11 @@ Após rodar `--enrich`, as notas são transformadas em material didático visual
 ```markdown
 ## Transcrição
 
-Muito bem vindo ao curso de Docker de zero a profissional para
+Muito bem vindo ao curso de Docker de zero a profissional pra
 desenvolvimento web. Este curso é o curso que te vai levar
 definitivamente ao conhecimento do uso desta tecnologia enquanto
 programador, mas obviamente contém muitos conteúdos que te poderão
-preparar para um outro tipo de funções, como é o caso de DevOps...
+preparar pra um outro tipo de funções, como é o caso de DevOps...
 ```
 
 ### Depois (enriquecido)
@@ -99,8 +144,8 @@ preparar para um outro tipo de funções, como é o caso de DevOps...
 Esta aula apresenta o **objetivo do curso**, o **perfil do instrutor**
 e explica **o que será aprendido ao longo do treinamento**.
 
-O foco do curso é ensinar **Docker para desenvolvedores web**,
-principalmente para criar **ambientes de desenvolvimento local**.
+O foco do curso é ensinar **Docker pra desenvolvedores web**,
+principalmente pra criar **ambientes de desenvolvimento local**.
 
 ---
 
@@ -133,7 +178,7 @@ Ao final do curso você será capaz de:
 - Docker será ensinado **do zero ao nível profissional**
 - O foco é **desenvolvimento web**
 - O curso é **prático e conceitual**
-- Pode servir de base para evoluir para **DevOps**
+- Pode servir de base pra evoluir pra **DevOps**
 
 ---
 
@@ -141,7 +186,7 @@ Ao final do curso você será capaz de:
 
 1. Qual é o principal objetivo do curso?
 2. O que são **Docker Images**?
-3. Para que serve o **Docker Compose**?
+3. Pra que serve o **Docker Compose**?
 
 ---
 
@@ -156,18 +201,36 @@ Ao final do curso você será capaz de:
 
 ---
 
-## Dicas para o Obsidian
+## Dicas pro Obsidian
 
 ### Plugins recomendados
 
-- **Dataview** — para queries no frontmatter (`course`, `tags`, `section`)
-- **Templater** — para templates de anotações
-- **Outline** — para navegar pelos headings com emojis
+- **Dataview** — queries no frontmatter (`course`, `tags`, `section`, `platform`)
+- **Templater** — templates de anotações
+- **Outline** — navegação pelos headings com emojis
 
-### Query Dataview de exemplo
+### Query Dataview — todas as aulas de Docker
 
 ```dataview
-TABLE section, lecture
+TABLE platform, section, lecture
 FROM #curso/docker-zero-a-profissional
 SORT lecture ASC
+```
+
+### Query Dataview — todas as aulas da DIO
+
+```dataview
+TABLE course, section
+FROM ""
+WHERE platform = "dio"
+SORT course, section
+```
+
+### Query Dataview — comparativo de plataformas
+
+```dataview
+TABLE length(rows) AS aulas
+FROM ""
+WHERE platform != null
+GROUP BY platform
 ```
