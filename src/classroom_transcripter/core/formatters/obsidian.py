@@ -10,6 +10,7 @@ Gera notas com:
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -240,13 +241,32 @@ class ObsidianFormatter(BaseFormatter):
 
 
 def _slugify_tag(text: str) -> str:
-    """Converte texto em tag amigável para Obsidian.
+    """Converte texto em tag ASCII-only válida pro Obsidian.
+
+    Pipeline:
+      1. Normaliza Unicode (NFKD) e remove marks de combinação (acentos)
+      2. Lowercase
+      3. Remove tudo que não é [a-z0-9 \\-]
+      4. Colapsa espaços/underscores em hífens
+      5. Colapsa hífens repetidos
+      6. Remove hífens das pontas
 
     >>> _slugify_tag("Docker - Zero a Profissional")
     'docker-zero-a-profissional'
+    >>> _slugify_tag("Introdução à Programação")
+    'introducao-a-programacao'
+    >>> _slugify_tag("Node.js Fundamentos")
+    'nodejs-fundamentos'
+    >>> _slugify_tag("C# para .NET")
+    'c-para-net'
     """
-    tag = text.lower().strip()
-    tag = re.sub(r"[^\w\s-]", "", tag)
+    # 1. Normaliza Unicode (NFKD separa acento da letra base: "ç" → "c" + "̧")
+    nfkd = unicodedata.normalize("NFKD", text)
+    # 2. Remove os marks de combinação (acentos)
+    ascii_text = "".join(c for c in nfkd if not unicodedata.combining(c))
+    # 3. Continua o pipeline original
+    tag = ascii_text.lower().strip()
+    tag = re.sub(r"[^a-z0-9\s-]", "", tag)
     tag = re.sub(r"[\s_]+", "-", tag)
     tag = re.sub(r"-+", "-", tag).strip("-")
     return tag
